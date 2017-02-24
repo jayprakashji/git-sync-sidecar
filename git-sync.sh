@@ -2,21 +2,43 @@
 
 ARG_GIT_SYNC_REPO=${ARG_GIT_SYNC_REPO:-}
 ARG_GIT_SYNC_BRANCH=${ARG_GIT_SYNC_BRANCH:-}
-ARG_GIT_SYNC_DEST=${ARG_GIT_SYNC_DEST:-}
-ARG_GIT_SYNC_REV=${ARG_GIT_SYNC_REV:-}
-GIT_ROOT="/git"
-SSH_KEY_DIR="/etc/secret/"
-SSH_KEY_FILE="ssh.key"
+#ARG_GIT_SYNC_DEST=${ARG_GIT_SYNC_DEST:-}
+#ARG_GIT_SYNC_REV=${ARG_GIT_SYNC_REV:-}
+#GIT_ROOT="/git"
+GIT_ROOT="/var/www/test/git"
+#SSH_KEY_DIR="/etc/secret/"
+SSH_KEY_DIR="/var/www/test/.ssh/"
+#SSH_KEY_FILE="ssh.key"
+SSH_KEY_FILE="gitsync1_id_rsa"
 ARG_SSH_KEY_DATA=${ARG_SSH_KEY_DATA:-}
+export ARG_DEBUG=${ARG_DEBUG:-}
+
+#export ARG_GIT_SYNC_REPO=git@dev.pgsk.sk:mvc.git
+#export ARG_GIT_SYNC_BRANCH=master
+#export ARG_DEBUG=1
+#export ARG_GIT_SYNC_REPO=git@dev.pgsk.sk:mvc.git
+#export ARG_GIT_SYNC_BRANCH=test_gitsync
+#export ARG_DEBUG=1
+
+
+debug_string (){
+    if [ ! -z ${ARG_DEBUG} ] ; then
+        echo "# $1"
+    fi
+}
 
 #if not exists ssh_key_dir mkdir
 if [ ! -d "$SSH_KEY_DIR" ]; then
+    debug_string "mkdir -p ${SSH_KEY_DIR}"
     mkdir -p ${SSH_KEY_DIR}
 fi
+
 #if !empty SSH_KEY_DATA && empty ssh_key_dir , create private key file
 if [ ! -z "$ARG_SSH_KEY_DATA" ] && [ ! -f "$SSH_KEY_DIR/$SSH_KEY_FILE" ] ; then
+    debug_string "echo ${ARG_SSH_KEY_DATA} | base64 -d - > ${SSH_KEY_DIR}/${SSH_KEY_FILE}"
     echo ${ARG_SSH_KEY_DATA} | base64 -d - > ${SSH_KEY_DIR}/${SSH_KEY_FILE}
 fi
+
 
 if [ ! -f "$SSH_KEY_DIR/$SSH_KEY_FILE" ] ; then
     echo "Missing ssh key file";
@@ -24,39 +46,74 @@ if [ ! -f "$SSH_KEY_DIR/$SSH_KEY_FILE" ] ; then
 fi
 
 #setup ssh GIT_SSH_COMMAND = ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i %s", pathToSSHSecret
+debug_string "GIT_SSH_COMMAND=\"ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $SSH_KEY_DIR/$SSH_KEY_FILE\""
 GIT_SSH_COMMAND="ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $SSH_KEY_DIR/$SSH_KEY_FILE"
+
+
+#create GIT_ROOT if not exits
+debug_string "Create $GIT_ROOT if [ ! -d "$GIT_ROOT" ]"
+if [ ! -d "$GIT_ROOT" ] ; then
+    debug_string "mkdir -p ${GIT_ROOT}"
+    mkdir -p ${GIT_ROOT}
+fi
+
 
 #check if exists GIT_ROOT/.git
 #clone
 #git clone --no-checkout -b GIT_SYNC_BRANCH --depth 1 GIT_SYNC_REPO GIT_ROOT
+debug_string "Clone if [ ! -d "$GIT_ROOT/.git" ]"
 if [ ! -d "$GIT_ROOT/.git" ] ; then
-    git clone --no-checkout -b GIT_SYNC_BRANCH --depth 1 GIT_SYNC_REPO GIT_ROOT
+    debug_string "git clone --no-checkout -b ${ARG_GIT_SYNC_BRANCH} --depth 1 ${ARG_GIT_SYNC_REPO} ${GIT_ROOT}"
+    git clone --no-checkout -b ${ARG_GIT_SYNC_BRANCH} --depth 1 ${ARG_GIT_SYNC_REPO} ${GIT_ROOT}
 fi
 
 
 
 #cd inside
-#cd GIT_ROOT
+debug_string "cd ${GIT_ROOT}"
+cd ${GIT_ROOT}
 
-#get HEAD revision
-#$hash = git rev-list -n1 HEAD
 
 #fetch data
-#git fetch --tags origin GIT_SYNC_BRANCH
+debug_string "git fetch --tags origin ${ARG_GIT_SYNC_BRANCH}"
+git fetch --tags origin ${ARG_GIT_SYNC_BRANCH}
+
+
+#get FETCH_HEAD revision
+#$hash = git rev-list -n1 FETCH_HEAD
+debug_string "REV_HASH=$(git rev-list -n1 FETCH_HEAD)"
+REV_HASH=$(git rev-list -n1 FETCH_HEAD)
+if [ -z ${REV_HASH} ] ; then
+    echo "could not get FETCH_HEAD rev hash. exit."
+    exit 1
+fi
+
 
 #workTreeDirName = rev-$hash
+debug_string "WORK_DIR_TREE_NAME=\"rev-$REV_HASH\""
+WORK_DIR_TREE_NAME="rev-$REV_HASH"
+
+
+
+
 
 #new worktree
-#git worktree add $workTreeDirName origin/GIT_SYNC_BRANCH
+debug_string "git worktree add ${WORK_DIR_TREE_NAME} origin/${ARG_GIT_SYNC_BRANCH}"
+git worktree add ${WORK_DIR_TREE_NAME} origin/${ARG_GIT_SYNC_BRANCH}
 
 #fix gitdir reference to relative path
-#echo "gitdir: ../.git/worktrees/$workTreeDirName" > $workTreeDirName/.git
+debug_string "echo \"gitdir: ../.git/worktrees/${WORK_DIR_TREE_NAME}\" > ${WORK_DIR_TREE_NAME}/.git"
+echo "gitdir: ../.git/worktrees/${WORK_DIR_TREE_NAME}" > ${WORK_DIR_TREE_NAME}/.git
+
 
 #tmp symlink
-#ln -snf rev-bc33cf21b096db4ba76535bf66ad20066fe3d216 tmp-link
+debug_string "ln -snf ${WORK_DIR_TREE_NAME} tmp-link"
+ln -snf ${WORK_DIR_TREE_NAME} tmp-link
+
 
 #replace symlink
-#mv -T tmp-link git
+debug_string "mv -T tmp-link git"
+mv -T tmp-link git
 
 
 
