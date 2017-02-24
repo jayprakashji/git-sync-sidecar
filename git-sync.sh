@@ -135,6 +135,7 @@ create_symlink (){
     debug_string "ln -snf ${WORK_DIR_TREE_NAME} tmp-link"
     ln -snf ${WORK_DIR_TREE_NAME} tmp-link
 
+    #TODO: remove previous worktree
 
     #replace symlink
     debug_string "mv -T tmp-link git"
