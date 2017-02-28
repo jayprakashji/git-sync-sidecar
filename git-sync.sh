@@ -13,6 +13,8 @@ SSH_KEY_FILE="gitsync1_id_rsa"
 ARG_SSH_KEY_DATA=${ARG_SSH_KEY_DATA:-}
 ARG_GIT_FETCH_SLEEP=${ARG_GIT_FETCH_SLEEP:-"60"}
 export ARG_DEBUG=${ARG_DEBUG:-}
+export COMPOSER_BIN="composer.phar"
+ARG_COMPOSER_INIT=${ARG_COMPOSER_INIT:-}
 
 #export ARG_GIT_SYNC_REPO=git@dev.pgsk.sk:mvc.git
 #export ARG_GIT_SYNC_BRANCH=master
@@ -74,8 +76,11 @@ git_clone (){
     #git clone --no-checkout -b GIT_SYNC_BRANCH --depth 1 GIT_SYNC_REPO GIT_ROOT
     debug_string "Clone if [ ! -d "${GIT_ROOT}/.git" ]"
     if [ ! -d "${GIT_ROOT}/.git" ] ; then
-        debug_string "git clone --no-checkout -b ${GIT_SYNC_BRANCH} --depth 1 ${GIT_SYNC_REPO} ${GIT_ROOT}"
-        git clone --no-checkout -b ${GIT_SYNC_BRANCH} --depth 1 ${GIT_SYNC_REPO} ${GIT_ROOT}
+        #cd inside
+        debug_string "cd ${GIT_ROOT}"
+        cd ${GIT_ROOT}
+        debug_string "git clone --no-checkout -b ${GIT_SYNC_BRANCH} --depth 1 ${GIT_SYNC_REPO} ."
+        git clone --no-checkout -b ${GIT_SYNC_BRANCH} --depth 1 ${GIT_SYNC_REPO} .
     fi
 }
 git_fetch (){
@@ -165,6 +170,20 @@ create_symlink (){
     debug_string "ln -snf ${WORK_DIR_TREE_NAME} tmp-link"
     ln -snf ${WORK_DIR_TREE_NAME} tmp-link
 
+
+}
+replace_symlink (){
+    local GIT_ROOT=$1
+
+    #cd inside
+    debug_string "cd ${GIT_ROOT}"
+    cd ${GIT_ROOT}
+
+    if [ ! -L "${GIT_ROOT}/tmp-link" ] ; then
+        debug_string "${GIT_ROOT}/tmp-link is not a link"
+        return;
+    fi
+
     #move prev-prev link to git-del
     if [ -L "git-prev" ]; then
         debug_string "mv -Tf git-prev git-del"
@@ -194,6 +213,30 @@ create_symlink (){
 
 }
 
+composer_install (){
+    local GIT_ROOT=$1
+    local GIT_DEST=$2
+    local COMPOSER_INIT=$3
+
+    debug_string "ARG_COMPOSER_INIT=${ARG_COMPOSER_INIT}"
+    if [ -z ${COMPOSER_INIT} ] ; then
+        debug_string "COMPOSER_INIT=${COMPOSER_INIT}"
+        return ;
+    fi
+
+    if [ ! -L ${GIT_ROOT}/${GIT_DEST} ] ; then
+        debug_string "${GIT_ROOT}/${GIT_DEST} is not a link"
+        return;
+    fi
+    #cd inside
+    debug_string "cd ${GIT_ROOT}/${GIT_DEST}"
+    cd ${GIT_ROOT}/${GIT_DEST}
+
+    if [ -f 'composer.lock' ] ; then
+        debug_string "${COMPOSER_BIN} install"
+        ${COMPOSER_BIN} install
+    fi
+}
 
 
 
@@ -216,7 +259,7 @@ do
     debug_string "REV_HASH=${REV_HASH}"
     if [ -z ${REV_HASH} ] ; then
         echo "could not get FETCH_HEAD rev hash. exit."
-        continue
+        exit 1;
     fi
 
     #workTreeDirName = rev-$hash
@@ -232,16 +275,19 @@ do
             continue
         fi
 
+        create_symlink ${GIT_ROOT} ${WORK_DIR_TREE_NAME}
 
         #app init in ${WORK_DIR_TREE_NAME}
         #composer install
+        composer_install ${GIT_ROOT} 'tmp-link' ${ARG_COMPOSER_INIT}
         #symfony console cache init
 
 
 
 
 
-        create_symlink ${GIT_ROOT} ${WORK_DIR_TREE_NAME}
+        replace_symlink ${GIT_ROOT}
+
         remove_symlink_and_target ${GIT_ROOT} 'git-del'
     fi
 
