@@ -14,6 +14,7 @@ ARG_SSH_KEY_DATA=${ARG_SSH_KEY_DATA:-}
 ARG_GIT_FETCH_SLEEP=${ARG_GIT_FETCH_SLEEP:-"60"}
 export ARG_DEBUG=${ARG_DEBUG:-}
 export COMPOSER_BIN="composer.phar"
+ARG_SYMFONY_CP_PARAM_DIST=${ARG_SYMFONY_CP_PARAM_DIST:-}
 ARG_COMPOSER_INIT=${ARG_COMPOSER_INIT:-}
 
 #export ARG_GIT_SYNC_REPO=git@dev.pgsk.sk:mvc.git
@@ -212,7 +213,27 @@ replace_symlink (){
 
 
 }
+symfony_cp_parameters_yml_dist () {
+    local GIT_ROOT=$1
+    local GIT_DEST=$2
+    local SYMFONY_CP_PARAM_DIST=$3
 
+    if [ -z ${SYMFONY_CP_PARAM_DIST} ] ; then
+        return ;
+    fi
+
+    if [ ! -L ${GIT_ROOT}/${GIT_DEST} ] ; then
+        debug_string "${GIT_ROOT}/${GIT_DEST} is not a link"
+        return;
+    fi
+
+    #cd inside
+    debug_string "cd ${GIT_ROOT}/${GIT_DEST}"
+    cd ${GIT_ROOT}/${GIT_DEST}
+
+    cp app/config/parameters.yml.dist app/config/parameters.yml
+
+}
 composer_install (){
     local GIT_ROOT=$1
     local GIT_DEST=$2
@@ -278,6 +299,8 @@ do
         create_symlink ${GIT_ROOT} ${WORK_DIR_TREE_NAME}
 
         #app init in ${WORK_DIR_TREE_NAME}
+        #copy parameters.yml from sy
+        symfony_cp_parameters_yml_dist ${GIT_ROOT} 'tmp-link' ${ARG_SYMFONY_CP_PARAM_DIST}
         #composer install
         composer_install ${GIT_ROOT} 'tmp-link' ${ARG_COMPOSER_INIT}
         #symfony console cache init
