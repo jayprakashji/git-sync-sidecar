@@ -123,6 +123,36 @@ new_git_worktree (){
 
 
 }
+remove_symlink_and_target (){
+    local GIT_ROOT=$1
+    local LINK_NAME=$2
+
+    #cd inside
+    debug_string "cd ${GIT_ROOT}"
+    cd ${GIT_ROOT}
+
+    if [ ! -L ${LINK_NAME} ] ; then
+        return ;
+    fi
+    debug_string "LINK_TARGET=\$(readlink ${LINK_NAME})"
+    LINK_TARGET=$(readlink ${LINK_NAME})
+
+    if [ ! -z ${LINK_TARGET} ] ; then
+        if [[ ! ${LINK_TARGET} == *"/"* ]] && [[ ! ${LINK_TARGET} == *".."* ]] ; then
+            debug_string "rm -rf ${LINK_TARGET}"
+            rm -rf ${LINK_TARGET}
+        else
+            echo "${LINK_NAME} is linked to a path containing '/' or '..'. Will delete only link. LINK_TARGET='${LINK_TARGET}'"
+        fi
+    fi
+    if [ -L ${LINK_NAME} ] ; then
+        debug_string "rm -rf ${LINK_NAME}"
+        rm -rf ${LINK_NAME}
+    fi
+
+}
+
+
 create_symlink (){
     local GIT_ROOT=$1
     local WORK_DIR_TREE_NAME=$2
@@ -135,11 +165,32 @@ create_symlink (){
     debug_string "ln -snf ${WORK_DIR_TREE_NAME} tmp-link"
     ln -snf ${WORK_DIR_TREE_NAME} tmp-link
 
-    #TODO: remove previous worktree
+    #move prev-prev link to git-del
+    if [ -L "git-prev" ]; then
+        debug_string "mv -Tf git-prev git-del"
+        mv -Tf git-prev git-del
+    fi
+    if [ -a "git-prev" ]; then
+        echo "git-prev was not a symlink. Moving to git-prev-error."
+        debug_string "mv -Tf git-prev git-prev-error"
+        mv -Tf git-prev git-prev-error
+    fi
+    if [ -L "git" ]; then
+        debug_string "mv -Tf git git-prev"
+        mv -Tf git git-prev
+    fi
+    if [ -a "git" ]; then
+        echo "git was not a symlink. Moving to git-error."
+        debug_string "mv -Tf git git-error"
+        mv -Tf git git-error
+    fi
+
 
     #replace symlink
-    debug_string "mv -T tmp-link git"
-    mv -T tmp-link git
+    debug_string "mv -Tf tmp-link git"
+    mv -Tf tmp-link git
+
+
 
 }
 
@@ -191,7 +242,7 @@ do
 
 
         create_symlink ${GIT_ROOT} ${WORK_DIR_TREE_NAME}
-
+        remove_symlink_and_target ${GIT_ROOT} 'git-del'
     fi
 
     sleep ${ARG_GIT_FETCH_SLEEP}
