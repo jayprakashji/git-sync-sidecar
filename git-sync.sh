@@ -1,34 +1,52 @@
 #!/usr/bin/env bash
 
+#ssh git repository , for example git@github.com:example.git
 ARG_GIT_SYNC_REPO=${ARG_GIT_SYNC_REPO:-}
+#branch without 'origin/'. That is added in script
 ARG_GIT_SYNC_BRANCH=${ARG_GIT_SYNC_BRANCH:-"master"}
+
 #ARG_GIT_SYNC_DEST=${ARG_GIT_SYNC_DEST:-}
 #ARG_GIT_SYNC_REV=${ARG_GIT_SYNC_REV:-}
+
+
 #GIT_ROOT="/git"
 GIT_ROOT="/var/www/test/git"
 #SSH_KEY_DIR="/etc/secret/"
 SSH_KEY_DIR="/var/www/test/.ssh/"
 #SSH_KEY_FILE="ssh.key"
 SSH_KEY_FILE="gitsync1_id_rsa"
-ARG_SSH_KEY_DATA=${ARG_SSH_KEY_DATA:-}
-ARG_GIT_FETCH_SLEEP=${ARG_GIT_FETCH_SLEEP:-"60"}
-export ARG_DEBUG=${ARG_DEBUG:-}
-export COMPOSER_BIN="composer.phar"
-ARG_SYMFONY_CP_PARAM_DIST=${ARG_SYMFONY_CP_PARAM_DIST:-}
-ARG_COMPOSER_INIT=${ARG_COMPOSER_INIT:-}
 
-#export ARG_GIT_SYNC_REPO=git@dev.pgsk.sk:mvc.git
-#export ARG_GIT_SYNC_BRANCH=master
-#export ARG_DEBUG=1
-#export ARG_GIT_SYNC_REPO=git@dev.pgsk.sk:mvc.git
-#export ARG_GIT_SYNC_BRANCH=test_gitsync
-#export ARG_DEBUG=1
+#if SSH_KEY_DIR and ARG_SSH_KEY_DATA not, key file is created from the variable
+ARG_SSH_KEY_DATA=${ARG_SSH_KEY_DATA:-}
+
+#in seconds. Wait time between fetch attempts.
+ARG_GIT_FETCH_SLEEP=${ARG_GIT_FETCH_SLEEP:-"60"}
+
+#if not empty, script will echo every command
+export ARG_DEBUG=${ARG_DEBUG:-}
+
+
+export ARG_COMPOSER_BIN=${ARG_COMPOSER_BIN:-"composer.phar"}
+
+#symfony composer install expects input of params if parameters.yml does not exist.
+#if you use another location for parameters.yml, like outside of project root, you need to copy default.
+ARG_SYMFONY_CP_PARAM_DIST=${ARG_SYMFONY_CP_PARAM_DIST:-}
+#if using for example kubernetes secrets, to store parameters.yml  ( https://kubernetes.io/docs/user-guide/secrets/ )
+# it will be mounted somewhere like /etc/secret-volume/parameters.yml
+#and copy to  "$GIT_ROOT/tmp-link/$ARG_SYMFONY_CP_PARAM_TARGET_SUBPATH
+ARG_SYMFONY_CP_PARAM_SECRET_FILE=${ARG_SYMFONY_CP_PARAM_SECRET_FILE:-}
+ARG_SYMFONY_CP_PARAM_TARGET_SUBPATH=${ARG_SYMFONY_CP_PARAM_TARGET_SUBPATH:-"../"}
+#if SUBPATH is inside cloned workdir, and parameters.yml is as default in project, you need to force overwrite it
+ARG_SYMFONY_CP_PARAM_OVERWRITE=${ARG_SYMFONY_CP_PARAM_OVERWRITE:-}
+#if project needs "composer install"
+ARG_COMPOSER_INSTALL=${ARG_COMPOSER_INSTALL:-}
+
 
 
 debug_string (){
     local MESSAGE=$1
     if [ ! -z ${ARG_DEBUG} ] ; then
-        echo "# ${MESSAGE}"
+        echo "#DEBUG# ${MESSAGE}"
     fi
 }
 prepare_ssh (){
@@ -230,18 +248,19 @@ symfony_cp_parameters_yml_dist () {
     #cd inside
     debug_string "cd ${GIT_ROOT}/${GIT_DEST}"
     cd ${GIT_ROOT}/${GIT_DEST}
-
-    cp app/config/parameters.yml.dist app/config/parameters.yml
+    if [ ! -f "app/config/parameters.yml" ] ; then
+        debug_string "cp app/config/parameters.yml.dist app/config/parameters.yml"
+        cp app/config/parameters.yml.dist app/config/parameters.yml
+    fi
 
 }
 composer_install (){
     local GIT_ROOT=$1
     local GIT_DEST=$2
-    local COMPOSER_INIT=$3
+    local COMPOSER_INSTALL=$3
 
-    debug_string "ARG_COMPOSER_INIT=${ARG_COMPOSER_INIT}"
-    if [ -z ${COMPOSER_INIT} ] ; then
-        debug_string "COMPOSER_INIT=${COMPOSER_INIT}"
+    if [ -z ${COMPOSER_INSTALL} ] ; then
+        debug_string "COMPOSER_INSTALL=${COMPOSER_INSTALL}"
         return ;
     fi
 
@@ -254,12 +273,39 @@ composer_install (){
     cd ${GIT_ROOT}/${GIT_DEST}
 
     if [ -f 'composer.lock' ] ; then
-        debug_string "${COMPOSER_BIN} install"
-        ${COMPOSER_BIN} install
+        debug_string "${ARG_COMPOSER_BIN} install"
+        ${ARG_COMPOSER_BIN} install
     fi
 }
+symfony_cp_parameters_yml_secret (){
+    local GIT_ROOT=$1
+    local GIT_DEST=$2
+    local SYMFONY_CP_PARAM_SECRET_FILE=$3
+    local SYMFONY_CP_PARAM_TARGET_SUBPATH=$4
+    local SYMFONY_CP_PARAM_OVERWRITE=$5
+
+    if [ ! -L ${GIT_ROOT}/${GIT_DEST} ] ; then
+        debug_string "${GIT_ROOT}/${GIT_DEST} is not a link"
+        return;
+    fi
+    #cd inside
+    debug_string "cd ${GIT_ROOT}/${GIT_DEST}"
+    cd ${GIT_ROOT}/${GIT_DEST}
+
+    if [ -z ${SYMFONY_CP_PARAM_OVERWRITE} ] && [ -f "${SYMFONY_CP_PARAM_TARGET_SUBPATH}/parameters.yml" ] ; then
+        return;
+    fi
+
+    if [ ! -f ${SYMFONY_CP_PARAM_SECRET_FILE} ] ; then
+        echo "SYMFONY_CP_PARAM_SECRET_FILE file does not exist :  SYMFONY_CP_PARAM_SECRET_FILE='${SYMFONY_CP_PARAM_SECRET_FILE}'"
+        return;
+    fi
+
+    debug_string "cp \"${SYMFONY_CP_PARAM_SECRET_FILE}\" \"${SYMFONY_CP_PARAM_TARGET_SUBPATH}/parameters.yml\""
+    cp "${SYMFONY_CP_PARAM_SECRET_FILE}" "${SYMFONY_CP_PARAM_TARGET_SUBPATH}/parameters.yml"
 
 
+}
 
 
 
@@ -299,10 +345,12 @@ do
         create_symlink ${GIT_ROOT} ${WORK_DIR_TREE_NAME}
 
         #app init in ${WORK_DIR_TREE_NAME}
-        #copy parameters.yml from sy
+        #copy parameters.yml from symfony parameters.yml.dist
+        symfony_cp_parameters_yml_secret ${GIT_ROOT} 'tmp-link' ${ARG_SYMFONY_CP_PARAM_SECRET_FILE} ${ARG_SYMFONY_CP_PARAM_TARGET_SUBPATH} ${ARG_SYMFONY_CP_PARAM_OVERWRITE}
+        #copy parameters.yml from symfony parameters.yml.dist
         symfony_cp_parameters_yml_dist ${GIT_ROOT} 'tmp-link' ${ARG_SYMFONY_CP_PARAM_DIST}
         #composer install
-        composer_install ${GIT_ROOT} 'tmp-link' ${ARG_COMPOSER_INIT}
+        composer_install ${GIT_ROOT} 'tmp-link' ${ARG_COMPOSER_INSTALL}
         #symfony console cache init
 
 
