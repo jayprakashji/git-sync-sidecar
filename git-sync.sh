@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env /bin/bash
 
 #ssh git repository , for example git@github.com:example.git
 ARG_GIT_SYNC_REPO=${ARG_GIT_SYNC_REPO:-}
@@ -9,12 +9,12 @@ ARG_GIT_SYNC_BRANCH=${ARG_GIT_SYNC_BRANCH:-"master"}
 #ARG_GIT_SYNC_REV=${ARG_GIT_SYNC_REV:-}
 
 
-#GIT_ROOT="/git"
-GIT_ROOT="/var/www/test/git"
-#SSH_KEY_DIR="/etc/secret/"
-SSH_KEY_DIR="/var/www/test/.ssh/"
-#SSH_KEY_FILE="ssh.key"
-SSH_KEY_FILE="gitsync1_id_rsa"
+GIT_ROOT="/git"
+#GIT_ROOT="/var/www/test/git"
+SSH_KEY_DIR="/etc/secret/"
+#SSH_KEY_DIR="/var/www/test/.ssh/"
+SSH_KEY_FILE="ssh.key"
+#SSH_KEY_FILE="gitsync1_id_rsa"
 
 #if SSH_KEY_DIR and ARG_SSH_KEY_DATA not, key file is created from the variable
 ARG_SSH_KEY_DATA=${ARG_SSH_KEY_DATA:-}
@@ -75,7 +75,7 @@ prepare_ssh (){
 
     #setup ssh GIT_SSH_COMMAND = ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i %s", SSH_KEY
     debug_string "GIT_SSH_COMMAND=\"ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${SSH_KEY}\""
-    GIT_SSH_COMMAND="ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${SSH_KEY}"
+    export GIT_SSH_COMMAND="ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${SSH_KEY}"
 }
 git_clone (){
     local GIT_ROOT=$1
@@ -205,28 +205,28 @@ replace_symlink (){
 
     #move prev-prev link to git-del
     if [ -L "git-prev" ]; then
-        debug_string "mv -Tf git-prev git-del"
-        mv -Tf git-prev git-del
+        debug_string "mv -f git-prev git-del"
+        mv -f git-prev git-del
     fi
     if [ -a "git-prev" ]; then
         echo "git-prev was not a symlink. Moving to git-prev-error."
-        debug_string "mv -Tf git-prev git-prev-error"
-        mv -Tf git-prev git-prev-error
+        debug_string "mv -f git-prev git-prev-error"
+        mv -f git-prev git-prev-error
     fi
     if [ -L "git" ]; then
-        debug_string "mv -Tf git git-prev"
-        mv -Tf git git-prev
+        debug_string "mv -f git git-prev"
+        mv -f git git-prev
     fi
     if [ -a "git" ]; then
         echo "git was not a symlink. Moving to git-error."
-        debug_string "mv -Tf git git-error"
-        mv -Tf git git-error
+        debug_string "mv -f git git-error"
+        mv -f git git-error
     fi
 
 
     #replace symlink
-    debug_string "mv -Tf tmp-link git"
-    mv -Tf tmp-link git
+    debug_string "mv -f tmp-link git"
+    mv -f tmp-link git
 
 
 
