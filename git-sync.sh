@@ -22,6 +22,10 @@ ARG_SSH_KEY_DATA=${ARG_SSH_KEY_DATA:-}
 #in seconds. Wait time between fetch attempts.
 ARG_GIT_FETCH_SLEEP=${ARG_GIT_FETCH_SLEEP:-"60"}
 
+#chown just before symlink switch
+ARG_CHOWN_UID=${ARG_CHOWN_UID:-}
+ARG_CHOWN_GID=${ARG_CHOWN_GID:-}
+
 #if not empty, script will echo every command
 export ARG_DEBUG=${ARG_DEBUG:-}
 
@@ -98,8 +102,13 @@ git_clone (){
         #cd inside
         debug_string "cd ${GIT_ROOT}"
         cd ${GIT_ROOT}
-        debug_string "git clone --no-checkout -b ${GIT_SYNC_BRANCH} --depth 1 ${GIT_SYNC_REPO} ."
-        git clone --no-checkout -b ${GIT_SYNC_BRANCH} --depth 1 ${GIT_SYNC_REPO} .
+        debug_string "git clone --no-checkout -b ${GIT_SYNC_BRANCH} --depth 1 ${GIT_SYNC_REPO} ./__tmpclone"
+        git clone --no-checkout -b ${GIT_SYNC_BRANCH} --depth 1 ${GIT_SYNC_REPO} ./__tmpclone
+        #workaround if the directory is not empty (default web root)
+        debug_string "mv ./__tmpclone/.git ."
+        mv ./__tmpclone/.git .
+        debug_string "rm -rf ./__tmpclone"
+        rm -rf ./__tmpclone
     fi
 }
 git_fetch (){
@@ -188,6 +197,38 @@ create_symlink (){
     #tmp symlink
     debug_string "ln -snf ${WORK_DIR_TREE_NAME} tmp-link"
     ln -snf ${WORK_DIR_TREE_NAME} tmp-link
+
+
+}
+chown_data () {
+    local GIT_ROOT=$1
+    local GIT_DEST=$2
+    local CHOWN_UID=$3
+    local CHOWN_GID=$4
+
+    if [ ! -L ${GIT_ROOT}/${GIT_DEST} ] ; then
+        debug_string "${GIT_ROOT}/${GIT_DEST} is not a link"
+        return;
+    fi
+    #cd inside
+    debug_string "cd ${GIT_ROOT}/${GIT_DEST}"
+    cd ${GIT_ROOT}/${GIT_DEST}
+
+    if [ ! -z ${CHOWN_UID} ] && [ ! -z ${CHOWN_GID} ] ; then
+        debug_string "chown -R ${CHOWN_UID}:${CHOWN_GID} ."
+        chown -R ${CHOWN_UID}:${CHOWN_GID} .
+        return;
+    fi
+    if [ ! -z ${CHOWN_UID} ]  ; then
+        debug_string "chown -R ${CHOWN_UID} ."
+        chown -R ${CHOWN_UID} .
+        return;
+    fi
+    if [ ! -z ${CHOWN_GID} ] ; then
+        debug_string "chown -R :${CHOWN_GID} ."
+        chown -R :${CHOWN_GID} .
+        return;
+    fi
 
 
 }
@@ -355,7 +396,7 @@ do
 
 
 
-
+        chown_data ${GIT_ROOT} 'tmp-link' ${ARG_CHOWN_UID} ${ARG_CHOWN_GID}
 
         replace_symlink ${GIT_ROOT}
 
