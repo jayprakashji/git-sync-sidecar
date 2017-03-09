@@ -1,0 +1,29 @@
+version: '2'
+services:
+  git-sync:
+    image: test/git-sync
+    environment:
+      ARG_GIT_SYNC_REPO: "git@github.com:example.git"
+      ARG_GIT_SYNC_BRANCH: "master"
+      ARG_GIT_FETCH_SLEEP: "60"
+      ARG_DEBUG: "1"
+      ARG_COMPOSER_BIN: "composer"
+      ARG_SYMFONY_CP_PARAM_DIST: 1
+      ARG_SYMFONY_CP_PARAM_SECRET_FILE: "/etc/secret/parameters.yml"
+      ARG_SYMFONY_CP_PARAM_TARGET_SUBPATH: "../"
+      ARG_COMPOSER_INSTALL: "1"
+      ARG_CHOWN_UID: "33"
+      ARG_CHOWN_GID: "33"
+    volumes:
+      - gitvolume:/git
+      - /var/www/test/.ssh:/etc/secret:ro
+  php71:
+    image: test/php71
+    volumes:
+      - gitvolume:/var/www/html
+    ports:
+      - "127.0.71.1:80:80"
+
+volumes:
+  gitvolume: {}
+
