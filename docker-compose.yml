@@ -10,7 +10,8 @@ services:
       ARG_COMPOSER_BIN: "composer"
       ARG_SYMFONY_CP_PARAM_DIST: 1
       ARG_SYMFONY_CP_PARAM_SECRET_FILE: "/etc/secret/parameters.yml"
-      ARG_SYMFONY_CP_PARAM_TARGET_SUBPATH: "../"
+      ARG_SYMFONY_CP_PARAM_TARGET_SUBPATH: "app/config/"
+      ARG_SYMFONY_CP_PARAM_OVERWRITE: 1
       ARG_COMPOSER_INSTALL: "1"
       ARG_CHOWN_UID: "33"
       ARG_CHOWN_GID: "33"
