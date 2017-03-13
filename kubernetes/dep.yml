@@ -1,0 +1,58 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gitsyncapp
+  labels:
+    name: gitsyncapp
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: gitsyncapp
+      labels:
+        name: gitsyncapp
+    spec:
+      containers:
+        - name: php71
+          image: jayprakashji/php71
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: gitroot
+              mountPath: /var/www/html
+        - name: gitsync
+          image: jayprakashji/git-sync-sidecar
+          env:
+          - name: ARG_GIT_SYNC_REPO
+            value: "git@github.com:example.git"
+          - name: ARG_GIT_SYNC_BRANCH
+            value: "master"
+          - name: ARG_GIT_FETCH_SLEEP
+            value: "60"
+          - name: ARG_DEBUG
+            value: "1"
+          - name: ARG_COMPOSER_BIN
+            value: "composer"
+          - name: ARG_SYMFONY_CP_PARAM_DIST
+            value: 1
+          - name: ARG_SYMFONY_CP_PARAM_SECRET_FILE
+            value: "/etc/secret/parameters.yml"
+          - name: ARG_SYMFONY_CP_PARAM_TARGET_SUBPATH
+            value: "app/config/"
+          - name: ARG_SYMFONY_CP_PARAM_OVERWRITE
+            value: 1
+          - name: ARG_COMPOSER_INSTALL
+            value: 1
+          - name: ARG_CHOWN_UID
+            value: 33
+          - name: ARG_CHOWN_UID
+            value: 33
+          volumeMounts:
+            - name: gitroot
+              mountPath: /git
+      restartPolicy: Always
+      volumes:
+        - name: gitroot
+          emptyDir: {}
+
+

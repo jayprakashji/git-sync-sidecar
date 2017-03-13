@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitsyncapp-svc
+  labels:
+    name: gitsyncapp-svc
+spec:
+  ports:
+  - name: http-gitsyncapp
+    port: 80
+    targetPort: 80
+    nodePort: 31711
+  type: NodePort
+  selector:
+    service: gitsyncapp
