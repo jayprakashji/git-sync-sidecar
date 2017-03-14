@@ -77,6 +77,9 @@ prepare_ssh (){
         exit 1
     fi
 
+    debug_string "chmod 600 ${SSH_KEY}"
+    chmod 600 ${SSH_KEY}
+
     #setup ssh GIT_SSH_COMMAND = ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i %s", SSH_KEY
     debug_string "GIT_SSH_COMMAND=\"ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${SSH_KEY}\""
     export GIT_SSH_COMMAND="ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${SSH_KEY}"
