@@ -12,4 +12,4 @@ spec:
     nodePort: 31711
   type: NodePort
   selector:
-    service: gitsyncapp
+    name: gitsyncapp
