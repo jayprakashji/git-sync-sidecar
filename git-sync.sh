@@ -67,7 +67,7 @@ prepare_ssh (){
     fi
 
     #if !empty SSH_KEY_DATA && empty ssh_key_dir , create private key file
-    if [ ! -z "${SSH_KEY_DATA}" ] && [ ! -f "SSH_KEY" ] ; then
+    if [ ! -z "${SSH_KEY_DATA}" ] && [ ! -f "${SSH_KEY}" ] ; then
         debug_string "echo ${SSH_KEY_DATA} | base64 -d - > ${SSH_KEY}"
         echo ${SSH_KEY_DATA} | base64 -d - > ${SSH_KEY}
     fi
